@@ -16,7 +16,9 @@ from datetime import datetime, timedelta
 import sys
 # get .env variables
 load_dotenv()
-DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+DISCORD_BOT_TOKEN = os.getenv(str("DISCORD_BOT_TOKEN"))
+print(DISCORD_BOT_TOKEN)
+print(f"type: {type(DISCORD_BOT_TOKEN)}")
 ENDPOINT = os.getenv("ENDPOINT")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 
@@ -25,6 +27,7 @@ bot = Bot(command_prefix="/", intents=intents, help_command=None)
 bot.channel_id = CHANNEL_ID
 bot.endpoint = ENDPOINT
 bot.debug = True
+bot.guild_ids = [bot.channel_id]
 if CHANNEL_ID is not None:
     CHANNEL_ID = CHANNEL_ID.split(",")  # split the string by comma to create an array
 characters_folder = 'Characters'

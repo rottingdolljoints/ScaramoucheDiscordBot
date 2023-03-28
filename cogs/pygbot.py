@@ -5,8 +5,6 @@ import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
-import nltk
-from nltk.tokenize import word_tokenize
 import datetime
 import openai
 import os
