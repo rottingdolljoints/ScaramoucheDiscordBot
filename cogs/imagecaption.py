@@ -53,7 +53,7 @@ class ImageCaptionCog(commands.Cog, name="image_caption"):
         return message_content
 
     def caption_image(self, raw_image):
-        inputs = self.processor(raw_image.convert('RGB'), return_tensors="pt").to("cpu", torch.float32)
+        inputs = self.processor(raw_image.convert('RGB'), return_tensors="pt")
         out = self.model.generate(**inputs, max_new_tokens=50)
         caption = self.processor.decode(out[0], skip_special_tokens=True)
 

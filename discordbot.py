@@ -4,33 +4,29 @@ import io
 import discord
 from PIL import Image
 from pathlib import Path
+import re
 import base64
+from dotenv import load_dotenv
 from discord.ext import commands
 from discord.ext.commands import Bot
 import asyncio
+import random
 import shutil
+from datetime import datetime, timedelta
 import sys
-import logging
-
-if __name__ == '__main__':
-    if len(sys.argv) < 4:
-        print('Usage: python discordbot.py <DISCORD_BOT_TOKEN> <ENDPOINT> <CHANNEL_ID>')
-        sys.exit(1)
-    DISCORD_BOT_TOKEN = sys.argv[1]
-    ENDPOINT = sys.argv[2]
-    CHANNEL_ID = sys.argv[3]
-# Access environment variables like this
-
+# get .env variables
+load_dotenv()
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+ENDPOINT = os.getenv("ENDPOINT")
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 intents = discord.Intents.all()
 bot = Bot(command_prefix="/", intents=intents, help_command=None)
-bot.endpoint = ENDPOINT
-bot.chatlog_dir = "chatlog_dir"
-bot.endpoint_connected = False
 bot.channel_id = CHANNEL_ID
-bot.guild_ids = [int(x) for x in sys.argv[3].split(",")]
+bot.endpoint = ENDPOINT
 bot.debug = True
-bot.char_name = ""
+if CHANNEL_ID is not None:
+    CHANNEL_ID = CHANNEL_ID.split(",")  # split the string by comma to create an array
 characters_folder = 'Characters'
 cards_folder = 'Cards'
 characters = []
@@ -140,11 +136,14 @@ if answer.lower() == "n":
     char_filename = os.path.join(characters_folder, data['char_filename'])
     char_image = data.get("char_image")
     shutil.copyfile(char_filename, "chardata.json")
+    bot.json_file = "chardata.json"
 else:
     update_name = "n"
 
+with open("chardata.json") as read_file:
+    character_data = json.load(read_file)
+    bot.user_name = character_data["char_name"]
 
-# on ready event that will update the character name and picture if you chose yes
 @bot.event
 async def on_ready():
     if update_name.lower() == "y":
@@ -159,53 +158,167 @@ async def on_ready():
             print(f"No image found for {char_name}. Setting image to default.")
         except discord.errors.HTTPException as error:
             if error.code == 50035 and 'Too many users have this username, please try another' in error.text:
-                new_name = input('Too many users have this username, Enter a new name(tip: üse án àccent lèttèr ): ')
-                await bot.user.edit(username=new_name, avatar=avatar_data)
+                await bot.user.edit(username=char_name + "BOT", avatar=avatar_data)
             elif error.code == 50035 and 'You are changing your username or Discord Tag too fast. Try again later.' in error.text:
                 pass
             else:
                 raise error
-    print(f"{bot.user.name} has connected to:")
 
-    for items in bot.guild_ids:
-        try:
-            # get the channel object from the channel ID
-            channel = bot.get_channel(int(items))
-            # get the guild object from the channel object
-            guild = channel.guild
-            # check that the channel is a text channel
-            if isinstance(channel, discord.TextChannel):
-                channel_name = channel.name
-                print(f"{guild.name} \ {channel_name}")
+
+
+async def get_last_messages(channel, limit=10):
+    messages = []
+    async for message in channel.history(limit=limit):
+        messages.append(message)
+        if message.author == channel.guild.me:
+            break
+    coroutines = [channel.fetch_message(id) for id in [msg.id for msg in messages[:-1]]]
+    results = await asyncio.gather(*coroutines)
+    formatted_messages = [f"{message.author.name}: {message.clean_content}" for message in reversed(results)]
+    return '\n'.join(formatted_messages)
+
+async def get_user_messages(channel, message_author, limit=10):
+    messages = []
+    async for message in channel.history(limit=limit):
+        if message.author == bot.user:
+            break
+        if message.author == message_author:
+            messages.append(message)
+    coroutines = [channel.fetch_message(id) for id in [msg.id for msg in messages[:-1]]]
+    results = await asyncio.gather(*coroutines)
+    formatted_messages = [f"{message.author.name}: {message.clean_content}" for message in
+                          reversed(results)]
+    return '\n'.join(formatted_messages)
+
+
+
+
+stop_names = [bot.user_name]
+async def on_message(message):
+    # if message starts with ".", "/"" or is by the bot - do nothing
+    if message.author == bot.user_name or message.clean_content.startswith((".", "/")):
+        return
+
+    # Add new message.author.name to stop_names list if they are not in there already to use for splitting messages
+    if message.author.name not in stop_names:
+        stop_names.append(message.author.name)
+
+    # Check if the message is sent in a server or a private message
+    if message.channel.id in CHANNEL_ID or message.guild is None:
+        message_content = message.clean_content
+        # Get the message content and the bot's name for pattern matching
+        content = message.clean_content.lower()
+        name_pattern = r"(\b|^){}(\b|$)".format(bot.user.name.split()[0].lower())
+        if message.reference is not None:
+            pass
+
+
+bot.event(on_message)
+
+
+async def has_image_attachment(message_content):
+    url_pattern = re.compile(r'http[s]?://[^\s/$.?#].[^\s]*\.(jpg|jpeg|png|gif)', re.IGNORECASE)
+    tenor_pattern = re.compile(r'https://tenor.com/view/[\w-]+')
+    for attachment in message_content.attachments:
+        if attachment.filename.lower().endswith((".jpg", ".jpeg", ".png", ".gif")):
+            return True
+        # Check if the message content contains a URL that ends with an image file extension
+    if url_pattern.search(message_content.content):
+        return True
+    # Check if the message content contains a Tenor GIF URL
+
+    elif tenor_pattern.search(message_content.content):
+        return True
+    else:
+        return False
+
+
+bot.current_message = ""
+async def has_image_attachment(message):
+    url_pattern = re.compile(r'http[s]?://[^\s/$.?#].[^\s]*\.(jpg|jpeg|png|gif)', re.IGNORECASE)
+    tenor_pattern = re.compile(r'https://tenor.com/view/[\w-]+')
+    for attachment in message.attachments:
+        if attachment.filename.lower().endswith((".jpg", ".jpeg", ".png", ".gif")):
+            return True
+    # Check if the message content contains a URL that ends with an image file extension
+    if url_pattern.search(message.clean_content):
+        return True
+    # Check if the message content contains a Tenor GIF URL
+    elif tenor_pattern.search(message.clean_content):
+        return True
+    else:
+        return False
+
+
+bot.current_message = ""
+async def check_for_new_messages(channel, last_message_time):
+    channel = bot.get_channel(channel)
+    stop_names = []  # Initialize stop_names list
+    while True:
+        # print("Checking for new messages...")
+        await asyncio.sleep(10 + random.randint(5, 10))  # Check every 60 seconds with random delay
+
+        # Get the timestamp of the last bot message in the channel
+        async for message in channel.history(limit=5):
+            if message.author == bot.user:
+                last_message_time = message.created_at
+                break
+
+        messages = [message async for message in channel.history(limit=None, after=last_message_time) if message.author != bot.user]
+
+        formatted_messages = []
+        for message in messages:
+            if message .clean_content.startswith((".", "/")):
+                continue
+            if await has_image_attachment(message):
+                image_caption = await bot.get_cog("image_caption").image_comment(message, message.clean_content)
+                message_content = f"{image_caption}"
             else:
-                print(f"Channel with ID {bot.channel_id} is not a text channel")
-        except AttributeError:
-            print(
-                "\n\n\n\nERROR: Unable to retrieve channel from .env \nPlease make sure you're using a valid channel ID, not a server ID.")
+                message_content = message.clean_content
+
+            formatted_message = f"{message.author.name}: {message_content}"
+            formatted_messages.append(formatted_message)
+
+            if message.author.name not in stop_names:
+                stop_names.append(message.author.name)
+
+        if len(formatted_messages) > 0:
+            new_messages = []
+            for message in formatted_messages:
+                for stop_name in stop_names:
+                    if message.startswith(stop_name + ': '):
+                        if bot.current_message and bot.current_message not in new_messages:
+                            new_messages.append(bot.current_message)
+                        bot.current_message = message
+                        break
+                    else:
+                        bot.current_message += message
+            if bot.current_message and bot.current_message not in new_messages:
+                new_messages.append(bot.current_message)
+
+            response = await bot.get_cog("chatbot").batch_chat_command("\n".join(new_messages), channel)
+
+            async with channel.typing():
+                await asyncio.sleep(1)  # Simulate some work being done
+                await channel.send(response)
+                bot.current_message = ""
+        last_message_time = datetime.now()
 
 
-# COG LOADER
+
 async def load_cogs() -> None:
     for file in os.listdir(f"{os.path.realpath(os.path.dirname(__file__))}/cogs"):
         if file.endswith(".py"):
             extension = file[:-3]
             try:
                 await bot.load_extension(f"cogs.{extension}")
-                if extension == 'pygbot':
-                    bot.endpoint_connected = True
-            except commands.ExtensionError as e:
-                if extension == 'pygbot':
-                    bot.endpoint_connected = False
-                if not bot.debug:
-                    logging.error(f"\n\nIssue with ENDPOINT. Please check your ENDPOINT in the .env file")
-                else:
-                    exception = f"{type(e).__name__}: {e}"
-                    print(f"Failed to load extension {extension}\n{exception}")
+            except Exception as e:
+                exception = f"{type(e).__name__}: {e}"
+                print(exception)
+
+
 
 
 asyncio.run(load_cogs())
-if bot.endpoint_connected:
-    try:
-        bot.run(DISCORD_BOT_TOKEN)
-    except discord.errors.LoginFailure:
-        print("\n\n\n\nThere is an error with the Discord Bot token. Please check your .env file")
+
+bot.run(DISCORD_BOT_TOKEN)
