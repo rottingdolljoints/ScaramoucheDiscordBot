@@ -11,9 +11,6 @@ import datetime
 import openai
 import os
 
-# Set the OpenAI API key
-
-
 
 now = datetime.datetime.now()
 date_string = now.strftime("It is %A %B %d %Y at %I:%M %p")
