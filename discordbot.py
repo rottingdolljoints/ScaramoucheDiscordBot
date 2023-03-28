@@ -173,6 +173,18 @@ async def on_ready():
                 pass
             else:
                 raise error
+            
+    print(f'{bot.user} has connected to Discord!')
+    last_message_time = datetime.now() - timedelta(minutes=1)
+    for channel_id in bot.guild_ids:
+        channel = bot.get_channel(int(channel_id))
+        while not bot.is_ready():
+            await asyncio.sleep(1)
+        asyncio.create_task(check_for_new_messages(channel.id, last_message_time))
+        # await channel.send(
+        #    "Initiating Tensorsama boot sequence...Loading modules and compiling scripts...System is up and running! Hello, I'm now online and ready to chat!")
+
+        
 
 
 
@@ -213,14 +225,7 @@ async def on_message(message):
     if message.author.name not in stop_names:
         stop_names.append(message.author.name)
 
-    # Check if the message is sent in a server or a private message
-    if message.channel.id in CHANNEL_ID or message.guild is None:
-        message_content = message.clean_content
-        # Get the message content and the bot's name for pattern matching
-        content = message.clean_content.lower()
-        name_pattern = r"(\b|^){}(\b|$)".format(bot.user.name.split()[0].lower())
-        if message.reference is not None:
-            pass
+
 
 
 bot.event(on_message)
@@ -265,7 +270,7 @@ async def check_for_new_messages(channel, last_message_time):
     channel = bot.get_channel(channel)
     stop_names = []  # Initialize stop_names list
     while True:
-        # print("Checking for new messages...")
+        print("Checking for new messages...")
         await asyncio.sleep(10 + random.randint(5, 10))  # Check every 60 seconds with random delay
 
         # Get the timestamp of the last bot message in the channel
