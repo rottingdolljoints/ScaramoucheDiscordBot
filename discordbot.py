@@ -6,7 +6,6 @@ from PIL import Image
 from pathlib import Path
 import re
 import base64
-from dotenv import load_dotenv
 from discord.ext import commands
 from discord.ext.commands import Bot
 import asyncio
@@ -15,21 +14,29 @@ import shutil
 from datetime import datetime, timedelta
 import sys
 # get .env variables
-load_dotenv()
-DISCORD_BOT_TOKEN = os.getenv(str("DISCORD_BOT_TOKEN"))
-print(DISCORD_BOT_TOKEN)
-print(f"type: {type(DISCORD_BOT_TOKEN)}")
-ENDPOINT = os.getenv("ENDPOINT")
-CHANNEL_ID = os.getenv("CHANNEL_ID")
+
+
+
+if __name__ == '__main__':
+    if len(sys.argv) < 4:
+        print('Usage: python discordbot.py <DISCORD_BOT_TOKEN> <ENDPOINT> <CHANNEL_ID>')
+        sys.exit(1)
+    DISCORD_BOT_TOKEN = sys.argv[1]
+    ENDPOINT = sys.argv[2]
+    CHANNEL_ID = sys.argv[3]
+# Access environment variables like this
+
+
 
 intents = discord.Intents.all()
 bot = Bot(command_prefix="/", intents=intents, help_command=None)
-bot.channel_id = CHANNEL_ID
 bot.endpoint = ENDPOINT
+bot.chatlog_dir = "chatlog_dir"
+bot.endpoint_connected = False
+bot.channel_id = CHANNEL_ID
+bot.guild_ids = [int(x) for x in sys.argv[3].split(",")]
 bot.debug = True
-bot.guild_ids = [bot.channel_id]
-if CHANNEL_ID is not None:
-    CHANNEL_ID = CHANNEL_ID.split(",")  # split the string by comma to create an array
+bot.char_name = ""
 characters_folder = 'Characters'
 cards_folder = 'Cards'
 characters = []

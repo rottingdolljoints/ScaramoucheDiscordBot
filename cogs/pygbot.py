@@ -4,7 +4,6 @@ import requests
 import discord
 from discord.ext import commands
 import os
-from dotenv import load_dotenv
 import datetime
 import openai
 import os
@@ -14,8 +13,6 @@ now = datetime.datetime.now()
 date_string = now.strftime("It is %A %B %d %Y at %I:%M %p")
 
 # load environment variables
-load_dotenv()
-CHANNEL_ID = os.getenv("CHANNEL_ID")
 CHATLOG_DIR = "chatlog_dir"
 
 
