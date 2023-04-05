@@ -5,14 +5,28 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
+<<<<<<< Updated upstream
 
 # configuration settings for the api
+=======
+import datetime
+import os
+
+
+now = datetime.datetime.now()
+date_string = now.strftime("It is %A %B %d %Y at %I:%M %p")
+
+# load environment variables
+CHATLOG_DIR = "chatlog_dir"
+
+>>>>>>> Stashed changes
 model_config = {
     "use_story": False,
     "use_authors_note": False,
     "use_world_info": False,
     "use_memory": False,
     "max_context_length": 2400,
+<<<<<<< Updated upstream
     "max_length": 80,
     "rep_pen": 1.02,
     "rep_pen_range": 1024,
@@ -20,6 +34,16 @@ model_config = {
     "temperature": 1.0,
     "tfs": 0.9,
     "top_p": 0.9,
+=======
+    "max_length": 1200,
+    "rep_pen": 1.04,
+    "rep_pen_range": 1024,
+    "rep_pen_slope": 0.9,
+    "temperature": 1.1,
+    "tfs": 0.9,
+    "top_k": 40,
+    "top_p": 0.95,
+>>>>>>> Stashed changes
     "typical": 1,
     "sampler_order": [6, 0, 1, 2, 3, 4, 5]
 }
@@ -38,6 +62,14 @@ class Chatbot:
             self.char_greeting = data["char_greeting"]
             self.world_scenario = data["world_scenario"]
             self.example_dialogue = data["example_dialogue"]
+<<<<<<< Updated upstream
+=======
+            self.endpoint = bot.endpoint
+            requests.put(f"{self.endpoint}/config", json=model_config)
+        # create chatlog directory if it doesn't exist
+        if not os.path.exists(CHATLOG_DIR):
+            os.makedirs(CHATLOG_DIR)
+>>>>>>> Stashed changes
 
         # initialize conversation history and character information
         self.convo_filename = None
@@ -58,9 +90,17 @@ class Chatbot:
             num_lines = min(len(lines), self.num_lines_to_keep)
             self.conversation_history = "<START>\n" + "".join(lines[-num_lines:])
 
+<<<<<<< Updated upstream
     async def save_conversation(self, message, message_content):
         self.conversation_history += f'{message.author.name}: {message_content}\n'
         # define the prompt
+=======
+
+    async def batch_save_conversation(self, message_content, channel):
+        # add user message to conversation history
+        self.conversation_history += f"{message_content}\n"
+        print(f"{message_content}\n")
+>>>>>>> Stashed changes
         self.prompt = {
             "prompt": self.character_info + '\n'.join(
                 self.conversation_history.split('\n')[-self.num_lines_to_keep:]) + f'{self.char_name}:',
@@ -71,6 +111,7 @@ class Chatbot:
         if response.status_code == 200:
             # Get the results from the response
             results = response.json()['results']
+<<<<<<< Updated upstream
             response_list = [line for line in results[0]['text'][1:].split("\n")]
             result = [response_list[0]]
             for item in response_list[1:]:
@@ -114,13 +155,33 @@ class Chatbot:
                 f.write(f'{self.char_name}: {response_text}\n')  # add a separator between
             return response_text
 
+=======
+            print(f"results{results}")
+            response_list = [line for line in results[0]['text'][1:].split("\n")]
+            response_text = response_list[0]
+            print(f"response_text{response_text}")
+
+            # add bot response to conversation history
+            self.conversation_history += f'{self.char_name}: {response_text}\n'
+            print(f'{self.char_name}: {response_text}\n')
+            with open(self.convo_filename, "a", encoding="utf-8") as f:
+                f.write(f'{message_content}\n')
+                f.write(f'{self.char_name}: {response_text}\n')
+            return response_text
+>>>>>>> Stashed changes
 
 
 class ChatbotCog(commands.Cog, name="chatbot"):
     def __init__(self, bot):
         self.bot = bot
+<<<<<<< Updated upstream
         self.chatlog_dir = bot.chatlog_dir
         self.chatbot = Chatbot("chardata.json", bot)
+=======
+        self.chatlog_dir = CHATLOG_DIR
+        self.channel_id = bot.channel_id
+        self.chatbot = Chatbot("chardata.json", self.bot)
+>>>>>>> Stashed changes
 
         # create chatlog directory if it doesn't exist
         if not os.path.exists(self.chatlog_dir):

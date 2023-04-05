@@ -5,8 +5,10 @@ import discord
 from PIL import Image
 from pathlib import Path
 import base64
+from discord import Emoji, PartialEmoji
 from discord.ext import commands
 from discord.ext.commands import Bot
+from discord.utils import get
 import asyncio
 import shutil
 import sys
@@ -167,6 +169,7 @@ async def on_ready():
                 raise error
     print(f"{bot.user.name} has connected to:")
 
+<<<<<<< Updated upstream
     for items in bot.guild_ids:
         try:
             # get the channel object from the channel ID
@@ -182,6 +185,177 @@ async def on_ready():
         except AttributeError:
             print(
                 "\n\n\n\nERROR: Unable to retrieve channel from .env \nPlease make sure you're using a valid channel ID, not a server ID.")
+=======
+        
+
+
+import re
+from discord.utils import get
+from discord import Emoji, PartialEmoji
+
+
+
+async def convert_emojis(bot, in_string):
+    string = in_string.replace("<<", "<")
+    # Regular expression to match strings like ":emoji_name:"
+    pattern = r":([\w\d]+):"
+    # Find all instances of the pattern in the input string
+    matches = re.findall(pattern, string)
+    # Loop through each match and replace it with the corresponding emoji
+    for match in matches:
+        # Find the emoji with the matching name
+        emoji = get(bot.emojis, name=match)
+        if emoji:
+            # If the emoji is a regular emoji, replace the match with its Unicode representation
+            if isinstance(emoji, Emoji):
+                string = string.replace(f":{match}:", str(emoji))
+            # If the emoji is an animated emoji, replace the match with its custom Discord format
+            elif isinstance(emoji, PartialEmoji) and emoji.animated:
+                string = string.replace(f":{match}:", f"<a:{emoji.name}:{emoji.id}>")
+            # If the emoji is a non-animated custom emoji, replace the match with its custom Discord format
+            elif isinstance(emoji, PartialEmoji):
+                string = string.replace(f":{match}:", f"<:{emoji.name}:{emoji.id}> ")
+    # Return the updated string with emojis converted
+    string_fixed = string.replace("<<", "<")
+    return string_fixed
+
+
+
+async def get_last_messages(channel, limit=10):
+    messages = []
+    async for message in channel.history(limit=limit):
+        messages.append(message)
+        if message.author == channel.guild.me:
+            break
+    coroutines = [channel.fetch_message(id) for id in [msg.id for msg in messages[:-1]]]
+    results = await asyncio.gather(*coroutines)
+    formatted_messages = [f"{message.author.name}: {message.clean_content}" for message in reversed(results)]
+    return '\n'.join(formatted_messages)
+
+async def get_user_messages(channel, message_author, limit=10):
+    messages = []
+    async for message in channel.history(limit=limit):
+        if message.author == bot.user:
+            break
+        if message.author == message_author:
+            messages.append(message)
+    coroutines = [channel.fetch_message(id) for id in [msg.id for msg in messages[:-1]]]
+    results = await asyncio.gather(*coroutines)
+    formatted_messages = [f"{message.author.name}: {message.clean_content}" for message in
+                          reversed(results)]
+    return '\n'.join(formatted_messages)
+
+
+
+
+stop_names = [bot.user_name]
+async def on_message(message):
+    # if message starts with ".", "/"" or is by the bot - do nothing
+    if message.author == bot.user_name or message.clean_content.startswith((".", "/")):
+        return
+
+    # Add new message.author.name to stop_names list if they are not in there already to use for splitting messages
+    if message.author.name not in stop_names:
+        stop_names.append(message.author.name)
+
+
+
+
+bot.event(on_message)
+
+
+async def has_image_attachment(message_content):
+    url_pattern = re.compile(r'http[s]?://[^\s/$.?#].[^\s]*\.(jpg|jpeg|png|gif)', re.IGNORECASE)
+    tenor_pattern = re.compile(r'https://tenor.com/view/[\w-]+')
+    for attachment in message_content.attachments:
+        if attachment.filename.lower().endswith((".jpg", ".jpeg", ".png", ".gif")):
+            return True
+        # Check if the message content contains a URL that ends with an image file extension
+    if url_pattern.search(message_content.content):
+        return True
+    # Check if the message content contains a Tenor GIF URL
+
+    elif tenor_pattern.search(message_content.content):
+        return True
+    else:
+        return False
+
+
+bot.current_message = ""
+async def has_image_attachment(message):
+    url_pattern = re.compile(r'http[s]?://[^\s/$.?#].[^\s]*\.(jpg|jpeg|png|gif)', re.IGNORECASE)
+    tenor_pattern = re.compile(r'https://tenor.com/view/[\w-]+')
+    for attachment in message.attachments:
+        if attachment.filename.lower().endswith((".jpg", ".jpeg", ".png", ".gif")):
+            return True
+    # Check if the message content contains a URL that ends with an image file extension
+    if url_pattern.search(message.clean_content):
+        return True
+    # Check if the message content contains a Tenor GIF URL
+    elif tenor_pattern.search(message.clean_content):
+        return True
+    else:
+        return False
+
+
+bot.current_message = ""
+async def check_for_new_messages(channel, last_message_time):
+    channel = bot.get_channel(channel)
+    stop_names = []  # Initialize stop_names list
+    while True:
+        print("Checking for new messages...")
+        await asyncio.sleep(10 + random.randint(5, 10))  # Check every 60 seconds with random delay
+
+        # Get the timestamp of the last bot message in the channel
+        async for message in channel.history(limit=5):
+            if message.author == bot.user:
+                last_message_time = message.created_at
+                break
+
+        messages = [message async for message in channel.history(limit=None, after=last_message_time) if message.author != bot.user]
+
+        formatted_messages = []
+        for message in messages:
+            if message .clean_content.startswith((".", "/")):
+                continue
+            if await has_image_attachment(message):
+                image_caption = await bot.get_cog("image_caption").image_comment(message, message.clean_content)
+                message_content = f"{image_caption}"
+            else:
+                message_content = message.clean_content
+
+
+            formatted_messages.append(f"{message.author.name}: {message_content}")
+
+            if message.author.name not in stop_names:
+                stop_names.append(message.author.name)
+
+        if len(formatted_messages) > 0:
+            new_messages = []
+            for message in formatted_messages:
+                for stop_name in stop_names:
+                    if message.startswith(stop_name + ':'):
+                        if bot.current_message and bot.current_message not in new_messages:
+                            new_messages.append(bot.current_message)
+                            last_message_time += timedelta(seconds=1)
+                        print(f'new messages: {new_messages}')
+                        bot.current_message = message
+                        break
+                    else:
+                        bot.current_message += message
+            if bot.current_message and bot.current_message not in new_messages:
+                new_messages.append(bot.current_message)
+
+            response_raw = await bot.get_cog("chatbot").batch_chat_command("\n".join(new_messages), channel)
+            response = await convert_emojis(bot, response_raw)
+            print(f'Bot response: {response}')
+            async with channel.typing():
+                await asyncio.sleep(1)  # Simulate some work being done
+                await channel.send(response)
+                bot.current_message = ""
+        last_message_time = datetime.now()
+
+>>>>>>> Stashed changes
 
 
 # COG LOADER
