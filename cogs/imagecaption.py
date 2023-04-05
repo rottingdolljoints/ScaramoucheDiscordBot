@@ -11,8 +11,8 @@ from transformers import BlipForConditionalGeneration, BlipProcessor
 class ImageCaptionCog(commands.Cog, name="image_caption"):
     def __init__(self, bot):
         self.bot = bot
-        self.processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-        self.model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base",
+        self.processor = BlipProcessor.from_pretrained("C:\\Users\\admin\\Documents\\blip-image-captioning-base")
+        self.model = BlipForConditionalGeneration.from_pretrained("C:\\Users\\admin\Documents\\blip-image-captioning-base",
                                                                   torch_dtype=torch.float32).to("cpu")
 
     @commands.command(name="image_comment")

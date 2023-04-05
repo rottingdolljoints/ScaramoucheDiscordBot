@@ -5,10 +5,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
-<<<<<<< Updated upstream
-
-# configuration settings for the api
-=======
 import datetime
 import os
 
@@ -19,31 +15,21 @@ date_string = now.strftime("It is %A %B %d %Y at %I:%M %p")
 # load environment variables
 CHATLOG_DIR = "chatlog_dir"
 
->>>>>>> Stashed changes
 model_config = {
     "use_story": False,
     "use_authors_note": False,
     "use_world_info": False,
     "use_memory": False,
-    "max_context_length": 2400,
-<<<<<<< Updated upstream
-    "max_length": 80,
-    "rep_pen": 1.02,
-    "rep_pen_range": 1024,
-    "rep_pen_slope": 0.9,
-    "temperature": 1.0,
-    "tfs": 0.9,
-    "top_p": 0.9,
-=======
+    "max_context_length": 1405,
     "max_length": 1200,
     "rep_pen": 1.04,
     "rep_pen_range": 1024,
     "rep_pen_slope": 0.9,
-    "temperature": 1.1,
+    "temperature": 0.65,
     "tfs": 0.9,
-    "top_k": 40,
-    "top_p": 0.95,
->>>>>>> Stashed changes
+    "top_k": 0,
+    "top_a": 0,
+    "top_p": 0.9,
     "typical": 1,
     "sampler_order": [6, 0, 1, 2, 3, 4, 5]
 }
@@ -62,14 +48,11 @@ class Chatbot:
             self.char_greeting = data["char_greeting"]
             self.world_scenario = data["world_scenario"]
             self.example_dialogue = data["example_dialogue"]
-<<<<<<< Updated upstream
-=======
             self.endpoint = bot.endpoint
             requests.put(f"{self.endpoint}/config", json=model_config)
         # create chatlog directory if it doesn't exist
         if not os.path.exists(CHATLOG_DIR):
             os.makedirs(CHATLOG_DIR)
->>>>>>> Stashed changes
 
         # initialize conversation history and character information
         self.convo_filename = None
@@ -90,17 +73,11 @@ class Chatbot:
             num_lines = min(len(lines), self.num_lines_to_keep)
             self.conversation_history = "<START>\n" + "".join(lines[-num_lines:])
 
-<<<<<<< Updated upstream
-    async def save_conversation(self, message, message_content):
-        self.conversation_history += f'{message.author.name}: {message_content}\n'
-        # define the prompt
-=======
 
     async def batch_save_conversation(self, message_content, channel):
         # add user message to conversation history
         self.conversation_history += f"{message_content}\n"
         print(f"{message_content}\n")
->>>>>>> Stashed changes
         self.prompt = {
             "prompt": self.character_info + '\n'.join(
                 self.conversation_history.split('\n')[-self.num_lines_to_keep:]) + f'{self.char_name}:',
@@ -111,51 +88,6 @@ class Chatbot:
         if response.status_code == 200:
             # Get the results from the response
             results = response.json()['results']
-<<<<<<< Updated upstream
-            response_list = [line for line in results[0]['text'][1:].split("\n")]
-            result = [response_list[0]]
-            for item in response_list[1:]:
-                if self.char_name in item:
-                    result.append(item)
-                else:
-                    break
-            new_list = [item.replace(self.char_name + ": ", '\n') for item in result]
-            response_text = ''.join(new_list)
-            # add bot response to conversation history
-            self.conversation_history = self.conversation_history + f'{self.char_name}: {response_text}\n'
-            with open(self.convo_filename, "a", encoding="utf-8") as f:
-                f.write(f'{message.author.name}: {message_content}\n')
-                f.write(f'{self.char_name}: {response_text}\n')  # add a separator between
-
-            return response_text
-
-    async def follow_up(self):
-        self.prompt = {
-            "prompt": self.character_info + '\n'.join(
-                self.conversation_history.split('\n')[-self.num_lines_to_keep:]) + f"{self.char_name}:",
-        }
-        print(self.prompt)
-        response = requests.post(f"{self.endpoint}/api/v1/generate", json=self.prompt)
-        print(response.json()['results'])
-        # check if the request was successful
-        if response.status_code == 200:
-            # Get the results from the response
-            results = response.json()['results']
-            response_list = [line for line in results[0]['text'][1:].split("\n")]
-            result = [response_list[0]]
-            for item in response_list[1:]:
-                if self.char_name in item:
-                    result.append(item)
-                else:
-                    break
-            new_list = [item.replace(self.char_name + ": ", '\n') for item in result]
-            response_text = ''.join(new_list)
-            self.conversation_history = self.conversation_history + f'{self.char_name}: {response_text}\n'
-            with open(self.convo_filename, "a", encoding="utf-8") as f:
-                f.write(f'{self.char_name}: {response_text}\n')  # add a separator between
-            return response_text
-
-=======
             print(f"results{results}")
             response_list = [line for line in results[0]['text'][1:].split("\n")]
             response_text = response_list[0]
@@ -168,20 +100,14 @@ class Chatbot:
                 f.write(f'{message_content}\n')
                 f.write(f'{self.char_name}: {response_text}\n')
             return response_text
->>>>>>> Stashed changes
 
 
 class ChatbotCog(commands.Cog, name="chatbot"):
     def __init__(self, bot):
         self.bot = bot
-<<<<<<< Updated upstream
-        self.chatlog_dir = bot.chatlog_dir
-        self.chatbot = Chatbot("chardata.json", bot)
-=======
         self.chatlog_dir = CHATLOG_DIR
         self.channel_id = bot.channel_id
         self.chatbot = Chatbot("chardata.json", self.bot)
->>>>>>> Stashed changes
 
         # create chatlog directory if it doesn't exist
         if not os.path.exists(self.chatlog_dir):
@@ -205,79 +131,16 @@ class ChatbotCog(commands.Cog, name="chatbot"):
 
 
 
-    # Normal Chat handler
-    @commands.command(name="chat")
-    async def chat_command(self, message, message_content) -> None:
-        # Get the gnarly response message from the chatbot and return it, dude!
-        if message.guild:
-            server_name = message.channel.name
-        else:
-            server_name = message.author.name
-        chatlog_filename = os.path.join(self.chatlog_dir, f"{self.chatbot.char_name}_{server_name}_chatlog.log")
-        if message.guild and self.chatbot.convo_filename != chatlog_filename or \
-                not message.guild and self.chatbot.convo_filename != chatlog_filename:
-            await self.chatbot.set_convo_filename(chatlog_filename)
-        response = await self.chatbot.save_conversation(message, await self.replace_user_mentions(message_content))
+
+    @commands.command(name="batch_chat")
+    async def batch_chat_command(self, message_content, channel) -> None:
+        # get response message from chatbot and return it
+        server_name = channel.id
+        chatlog_filename = os.path.join(self.chatlog_dir, f"{server_name} - chatlog.txt")
+        # set the conversation filename
+        await self.chatbot.set_convo_filename(chatlog_filename)
+        response = await self.chatbot.batch_save_conversation(message_content, channel)
         return response
-
-    @app_commands.command(name="followup", description="Make the bot send another message")
-    async def followup(self, interaction: discord.Interaction) -> None:
-        if interaction.guild:
-            server_name = interaction.channel.name
-        else:
-            server_name = interaction.author.name
-        chatlog_filename = os.path.join(self.chatlog_dir, f"{self.chatbot.char_name}_{server_name}_chatlog.log")
-        if interaction.guild and self.chatbot.convo_filename != chatlog_filename or \
-                not interaction.guild and self.chatbot.convo_filename != chatlog_filename:
-            await self.chatbot.set_convo_filename(chatlog_filename)
-        await interaction.response.defer()
-        await interaction.delete_original_response()
-        await interaction.channel.send(await self.chatbot.follow_up())
-
-
-
-    @app_commands.command(name="regenerate", description="regenerate last message")
-    async def regenerate(self, interaction: discord.Interaction) -> None:
-        await interaction.response.defer()
-        await interaction.delete_original_response()
-        if interaction.guild:
-            server_name = interaction.channel.name
-        else:
-            server_name = interaction.author.name
-        chatlog_filename = os.path.join(self.chatlog_dir, f"{self.chatbot.char_name}_{server_name}_chatlog.log")
-        if interaction.guild and self.chatbot.convo_filename != chatlog_filename or \
-                not interaction.guild and self.chatbot.convo_filename != chatlog_filename:
-            await self.chatbot.set_convo_filename(chatlog_filename)
-        # Get the last message sent by the bot in the channel
-        async for message in interaction.channel.history(limit=1):
-            if message.author == self.bot.user:
-                await message.delete()
-                lines = self.chatbot.conversation_history.splitlines()
-                for i in range(len(lines) - 1, -1, -1):
-                    if lines[i].startswith(f"{self.bot.name}:"):
-                        lines[i] = f"{self.bot.name}:"
-                        self.chatbot.conversation_history = "\n".join(lines)
-                        self.chatbot.conversation_history = self.chatbot.conversation_history
-                        break
-                print(f"string after: {repr(self.chatbot.conversation_history)}")
-                break  # Exit the loop after deleting the message
-        with open(self.chatbot.convo_filename, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            # Find the last line that matches "Tensor: {message.content}"
-            last_line_num_to_overwrite = None
-            for i in range(len(lines) - 1, -1, -1):
-                if f"{self.bot.name}: {message.content}" in lines[i]:
-                    last_line_num_to_overwrite = i
-                    break
-            if last_line_num_to_overwrite is not None:
-                lines[last_line_num_to_overwrite] = ""
-                # Modify the last line that matches "self.bot.name: {message.content}"
-            with open(self.chatbot.convo_filename, "w", encoding="utf-8") as f:
-                f.writelines(lines)
-                f.close()
-        await interaction.channel.send(await self.chatbot.follow_up())
-
-
 
 
 async def setup(bot):

@@ -13,6 +13,12 @@ import asyncio
 import shutil
 import sys
 import logging
+import asyncio
+import random
+import shutil
+from datetime import datetime, timedelta
+import sys
+# get .env variables
 
 if __name__ == '__main__':
     if len(sys.argv) < 4:
@@ -22,7 +28,6 @@ if __name__ == '__main__':
     ENDPOINT = sys.argv[2]
     CHANNEL_ID = sys.argv[3]
 # Access environment variables like this
-
 
 intents = discord.Intents.all()
 bot = Bot(command_prefix="/", intents=intents, help_command=None)
@@ -145,6 +150,9 @@ if answer.lower() == "n":
 else:
     update_name = "n"
 
+with open("chardata.json") as read_file:
+    character_data = json.load(read_file)
+    bot.user_name = character_data["char_name"]
 
 # on ready event that will update the character name and picture if you chose yes
 @bot.event
@@ -167,25 +175,14 @@ async def on_ready():
                 pass
             else:
                 raise error
-    print(f"{bot.user.name} has connected to:")
+    print(f'{bot.user} has connected to Discord!')
+    last_message_time = datetime.now() - timedelta(minutes=1)
+    for channel_id in bot.guild_ids:
+        channel = bot.get_channel(int(channel_id))
+        while not bot.is_ready():
+            await asyncio.sleep(1)
+        asyncio.create_task(check_for_new_messages(channel.id, last_message_time))
 
-<<<<<<< Updated upstream
-    for items in bot.guild_ids:
-        try:
-            # get the channel object from the channel ID
-            channel = bot.get_channel(int(items))
-            # get the guild object from the channel object
-            guild = channel.guild
-            # check that the channel is a text channel
-            if isinstance(channel, discord.TextChannel):
-                channel_name = channel.name
-                print(f"{guild.name} \ {channel_name}")
-            else:
-                print(f"Channel with ID {bot.channel_id} is not a text channel")
-        except AttributeError:
-            print(
-                "\n\n\n\nERROR: Unable to retrieve channel from .env \nPlease make sure you're using a valid channel ID, not a server ID.")
-=======
         
 
 
@@ -355,7 +352,6 @@ async def check_for_new_messages(channel, last_message_time):
                 bot.current_message = ""
         last_message_time = datetime.now()
 
->>>>>>> Stashed changes
 
 
 # COG LOADER
