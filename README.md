@@ -1,3 +1,15 @@
+
+# This Branch is for the memory and logic code WIP
+requires: 
+https://huggingface.co/kabita-choudhary/finetuned-bart-for-conversation-summary
+https://huggingface.co/microsoft/git-base-coco
+
+at the time of writing this hugging face is not downloading the models properly so save them somewhere then link them in the pygbot cog and imagehandler cog.
+
+
+
+Credit goes to The Face of Goonery
+
 # Discord Tavern Style Pygmalion Chatbot
 This is a discord bot that uses Pygmalion-6B and a KoboldAI url. The bot now supports json files and tavern cards and will change its name and image automatically.
 
