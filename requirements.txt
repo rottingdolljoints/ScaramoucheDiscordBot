@@ -3,3 +3,5 @@ python-dotenv
 Pillow
 discord.py
 transformers
+sentence_transformers
+accelerate

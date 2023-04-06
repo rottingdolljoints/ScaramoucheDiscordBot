@@ -5,14 +5,15 @@ from io import BytesIO
 import requests
 import re
 import torch
-from transformers import BlipForConditionalGeneration, BlipProcessor
+from transformers import AutoProcessor, AutoModelForCausalLM
+
 
 
 class ImageCaptionCog(commands.Cog, name="image_caption"):
     def __init__(self, bot):
         self.bot = bot
-        self.processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-        self.model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base",
+        self.processor = AutoProcessor.from_pretrained("C:\\Users\\admin\\Documents\\git-base-coco")
+        self.model = AutoModelForCausalLM.from_pretrained("C:\\Users\\admin\\Documents\\git-base-coco",
                                                                   torch_dtype=torch.float32).to("cpu")
 
     @commands.command(name="image_comment")
@@ -48,16 +49,23 @@ class ImageCaptionCog(commands.Cog, name="image_caption"):
             image = Image.open(BytesIO(response.content)).convert('RGB')
 
         # Generate the image caption
-        caption = self.caption_image(image)
-        message_content = f"{message_content} [{message.author.name} posts a picture of {caption}]"
+        caption = self.caption_image(image,message_content)
+        message_content = f"{message_content} [{message.author.name} posts a picture. {caption}]"
         return message_content
 
-    def caption_image(self, raw_image):
-        inputs = self.processor(raw_image.convert('RGB'), return_tensors="pt").to("cpu", torch.float32)
-        out = self.model.generate(**inputs, max_new_tokens=50)
-        caption = self.processor.decode(out[0], skip_special_tokens=True)
+    def caption_image(self, raw_image,question=""):
+        pixel_values = processor(images=raw_image, return_tensors="pt").pixel_values
 
-        return caption
+        generated_ids = model.generate(pixel_values=pixel_values, max_length=150)
+        generated_caption = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+        #inputs = self.processor(raw_image.convert('RGB'), return_tensors="pt").to("cpu", torch.float32)
+        #out = self.model.generate(**inputs, max_new_tokens=50)
+        #caption = self.processor.decode(out[0], skip_special_tokens=True)
+
+        #return caption
+        print(generated_caption)
+        return question + ". It's a picture of " + str(generated_caption)
 
 
 async def setup(bot):
