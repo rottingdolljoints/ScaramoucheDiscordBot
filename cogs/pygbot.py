@@ -4,25 +4,11 @@ import requests
 import discord
 from discord import app_commands
 from discord.ext import commands
+from langchain.chains import ConversationChain
 import os
-
-# configuration settings for the api
-model_config = {
-    "use_story": False,
-    "use_authors_note": False,
-    "use_world_info": False,
-    "use_memory": False,
-    "max_context_length": 2400,
-    "max_length": 120,
-    "rep_pen": 1.02,
-    "rep_pen_range": 1024,
-    "rep_pen_slope": 0.9,
-    "temperature": 1.0,
-    "tfs": 0.9,
-    "top_p": 0.9,
-    "typical": 1,
-    "sampler_order": [6, 0, 1, 2, 3, 4, 5]
-}
+from cleantext import clean
+from langchain import KoboldApiLLM
+from langchain.prompts.prompt import PromptTemplate
 
 def embedder(msg):
     embed = discord.Embed(
@@ -32,27 +18,79 @@ def embedder(msg):
     return embed
 
 
+
 class Chatbot:
     def __init__(self, char_filename, bot):
         self.prompt = None
         self.endpoint = bot.endpoint
-        # Send a PUT request to modify the settings
-        requests.put(f"{self.endpoint}/config", json=model_config)
-        # read character data from JSON file
+        self.histories = {}  # Initialize the history dictionary
+        self.stop_sequences = {}  # Initialize the stop sequences dictionary
+        self.llm = KoboldApiLLM(endpoint=self.endpoint)
+
         with open(char_filename, "r", encoding="utf-8") as f:
             data = json.load(f)
-            self.char_name = data["char_name"]
-            self.char_persona = data["char_persona"]
-            self.char_greeting = data["char_greeting"]
-            self.world_scenario = data["world_scenario"]
-            self.example_dialogue = data["example_dialogue"]
+            self.char_name = data.get("char_name", "")
+            self.char_persona = data.get("char_persona", "")
+            self.world_scenario = data.get("world_scenario", "")
+            self.example_dialogue = data.get("example_dialogue", "")
 
         # initialize conversation history and character information
         self.convo_filename = None
         self.conversation_history = ""
-        self.character_info = f"{self.char_name}'s Persona: {self.char_persona}\nScenario: {self.world_scenario}\n{self.example_dialogue}\n"
+        self.top_character_info = self.format_character_info()
+        self.bottom_character_info = self.format_bottom_character_info()
+        """
+        
+        the format I want:
+        Persona : top character info
+        Scenario : top character info
+        Example of Dialogues : top character info
+        Chat history
+        Author's Note aka bottom character info
+        User message : name: message_content
+        Bot Name:
+        """
+        
+        
+    def format_bottom_character_info(self):
+        """
+        This helper function formats the character_info string, including the optional parts only if they exist.
+        """
+        info_str = f"\n{self.char_name}'s Persona: {self.char_persona}\n"
 
-        self.num_lines_to_keep = 20
+        if self.world_scenario:
+            info_str += f"\nScenario: {self.world_scenario}\n"
+            
+        return info_str
+        
+
+        
+        
+    def format_top_character_info(self):
+        """
+        This helper function formats the character_info string, including the optional parts only if they exist.
+        """
+        info_str = f"Character: {self.char_name}\n{self.char_name}'s Persona: {self.char_persona}\n"
+
+        if self.world_scenario:  # Check if world_scenario exists
+            info_str += f"Scenario: {self.world_scenario}\n"
+        
+        if self.example_dialogue:  # Check if example_dialogue exists
+            info_str += f"Example Dialogue:\n{self.example_dialogue}\n"
+            
+        return info_str
+
+    async def get_stop_sequence_for_channel(self, channel_id, name):
+        name_token = f"\n{name}:"
+        if channel_id not in self.stop_sequences:
+            self.stop_sequences[channel_id] = [
+                "### Instruction",
+                "### Response",
+                "\n\n"
+            ] 
+        if name_token not in self.stop_sequences[channel_id]:
+            self.stop_sequences[channel_id].append(name_token)
+        return self.stop_sequences[channel_id]
 
     async def set_convo_filename(self, convo_filename):
         # set the conversation filename and load conversation history from file
@@ -66,35 +104,71 @@ class Chatbot:
             num_lines = min(len(lines), self.num_lines_to_keep)
             self.conversation_history = "<START>\n" + "".join(lines[-num_lines:])
 
-    async def save_conversation(self, message, message_content):
-        self.conversation_history += f'{message.author.name}: {message_content}\n'
-        # define the prompt
-        self.prompt = {
-            "prompt": self.character_info + '\n'.join(
-                self.conversation_history.split('\n')[-self.num_lines_to_keep:]) + f'{self.char_name}:',
-        }
-        # send a post request to the API endpoint
-        response = requests.post(f"{self.endpoint}/api/v1/generate", json=self.prompt)
-        # check if the request was successful
-        if response.status_code == 200:
-            # Get the results from the response
-            results = response.json()['results']
-            response_list = [line for line in results[0]['text'][1:].split("\n")]
-            result = [response_list[0]]
-            for item in response_list[1:]:
-                if self.char_name in item:
-                    result.append(item)
-                else:
-                    break
-            new_list = [item.replace(self.char_name + ": ", '\n') for item in result]
-            response_text = ''.join(new_list)
-            # add bot response to conversation history
-            self.conversation_history = self.conversation_history + f'{self.char_name}: {response_text}\n'
-            with open(self.convo_filename, "a", encoding="utf-8") as f:
-                f.write(f'{message.author.name}: {message_content}\n')
-                f.write(f'{self.char_name}: {response_text}\n')  # add a separator between
+    async def generate_response(self, message, message_content) -> None:
+        channel_id = str(message.channel.id)
+        name = message.author.display_name
+        memory = await self.get_memory_for_channel(str(channel_id))
+        stop_sequence = await self.get_stop_sequence_for_channel(channel_id, name)
+        chat_participants = await self.get_chat_participants_for_channel(channel_id, name)
+        print(f"chat participants: {chat_participants}\n total chat participants: {len(chat_participants)}")
+        print(f"stop sequences: {stop_sequence}")
+        formatted_message = f"{name}: {message_content}"
+        system_message = await self.generate_system_message()
+        MAIN_TEMPLATE = '''
+{{history}}
+{{input}}
+{BOTNAME}:'''
+        
+        
+        PROMPT = PromptTemplate(
+            input_variables=["history", "input", "bot_name",""], template=MAIN_TEMPLATE
+        )
+        
+        
+        # Create a conversation chain using the channel-specific memory
+        conversation = ConversationChain(
+            prompt=PROMPT,
+            llm=self.llm,
+            verbose=True,
+            memory=memory,
+        )
+        input_dict = {"input": formatted_message, "stop": stop_sequence}
+        response_text = conversation(input_dict)
+        response = await self.detect_and_replace_out(response_text["response"])
+        with open(self.convo_filename, "a", encoding="utf-8") as f:
+            f.write(f'{message.author.display_name}: {message_content}\n')
+            f.write(f'{self.char_name}: {response_text}\n')  # add a separator between
 
-            return response_text
+        return response
+            
+
+    async def save_conversation(self, message, message_content):
+        channel_id = str(message.channel.id)
+        self.conversation_history += f'{message.author.display_name}: {message_content}\n'
+        stop_sequence = await self.get_stop_sequence_for_channel(channel_id, self.char_name)
+        # create a multiline fstring version of self.character_info
+        
+        self.character_info = """
+        {self.char_name}'s Persona: {self.char_persona}
+        Scenario: {self.world_scenario}
+        
+        """
+        # define the prompt
+        self.prompt =  self.character_info + '\n'.join(self.conversation_history.split('\n')[-self.num_lines_to_keep:]) + f'{self.char_name}:'
+        
+
+
+        # send a post request to the API endpoint
+        response = self.llm(self.prompt, stop_sequences=stop_sequence) 
+        # check if the request was successful
+
+        # add bot response to conversation history
+        self.conversation_history = self.conversation_history + f'{self.char_name}: {response}\n'
+        with open(self.convo_filename, "a", encoding="utf-8") as f:
+            f.write(f'{message.author.display_name}: {message_content}\n')
+            f.write(f'{self.char_name}: {response}\n')  # add a separator between
+
+            return response
 
     async def follow_up(self):
         self.conversation_history = self.conversation_history
@@ -159,7 +233,7 @@ class ChatbotCog(commands.Cog, name="chatbot"):
         if message.guild:
             server_name = message.channel.name
         else:
-            server_name = message.author.name
+            server_name = message.author.display_name
         chatlog_filename = os.path.join(self.chatlog_dir, f"{self.chatbot.char_name}_{server_name}_chatlog.log")
         if message.guild and self.chatbot.convo_filename != chatlog_filename or \
                 not message.guild and self.chatbot.convo_filename != chatlog_filename:
