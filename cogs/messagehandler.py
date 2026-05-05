@@ -1,19 +1,12 @@
 import asyncio
-from datetime import datetime, timedelta
 import re
 import discord
 from discord.ext import commands
 from discord import app_commands
 
-# from helpers.db_manager import log_message
+from helpers.embed import embedder
 
 SLEEPTIMER = 2
-WAITTIMER = 45
-
-
-def embedder(msg):
-    embed = discord.Embed(description=f"{msg}", color=0x9C84EF)
-    return embed
 
 
 class ListenerCog(commands.Cog, name="listener"):
@@ -21,19 +14,13 @@ class ListenerCog(commands.Cog, name="listener"):
         self.bot = bot
         self.llm = self.bot.llm
         self.aliases = []
-        # self.aliases = self.bot.config['ALIASES']
-        # create a dictionary of messages where the channel id is the key and the value is the message
         self.message_dict = {}
-        # self.listen_only_mode needs to be a dictionary with the guild id as the key and the value as the boolean
         self.listen_only_mode = {
             str(guild_id): False for guild_id in self.bot.guild_ids
         }
-        # self.bot.sent_last_message = {str(channel_id): True for channel_id in self.bot.channel_list}
         self.timer_running = {}
-
         self.ping_mode = self.bot.always_reply
 
-    # create a function that will take a message and add it to the message dictionary wit the channel id as the key. if the key already exists, it will append the message to the list of messages
     async def add_message_to_dict(self, message, message_content):
         if str(message.channel.id) in self.message_dict:
             self.message_dict[str(message.channel.id)].append(
@@ -43,44 +30,6 @@ class ListenerCog(commands.Cog, name="listener"):
             self.message_dict[str(message.channel.id)] = [
                 f"{message.author.display_name}: {message_content}"
             ]
-
-    # # function that will send the list of messages for a channel to the logic cog
-    # async def send_message_list(self, channel_id):
-    #     # get the list of messages for the channel
-    #     message_list = self.message_dict[str(channel_id)]
-    #     print(f"message_list: {message_list}")
-    #     # join message list by \n
-    #     message_list = "\n".join(message_list)
-    #     print(f" joined message_list: {message_list}")
-
-    #     # send the prompt to the logic cog
-    #     response = await self.bot.get_cog("extra_logic").my_turn(message_list)
-    #     # return the response
-    #     return response
-
-    # async def set_timer(self, channel_id):
-    #     if not self.timer_running.get(channel_id, False):
-    #         self.timer_running[channel_id] = True
-
-    #         if not self.bot.sent_last_message.get(channel_id, False):
-    #             print(f"Message wait Timer started for channel {channel_id}")
-    #             await asyncio.sleep(WAITTIMER)
-    #             print(f"Message wait Timer ended for channel {channel_id}")
-
-    #             # Check if self.bot.sent_last_message is still False for the channel
-    #             if not self.bot.sent_last_message.get(channel_id, False):
-    #                 bot_turn = await self.send_message_list(channel_id)
-    #                 if bot_turn and len(self.bot.chat_participants[str(channel_id)]) == 0:
-    #                 # if bot_turn or len(self.bot.chat_participants[str(channel_id)]) == 2:
-    #                     channel = self.bot.get_channel(channel_id)
-    #                     async with channel.typing():
-    #                         message = await self.bot.get_cog("chatbot").force_generate_message(str(channel_id))
-    #                         response_obj = await channel.send(message)
-    #                         self.bot.sent_last_message[str(channel_id)] = True
-    #                         await log_message(response_obj)
-    #                         bot_turn = False
-
-    #         self.timer_running[channel_id] = False
 
     # Create a select menu for the listen-only mode command
     class ListenOnlyModeSelect(discord.ui.Select):
@@ -197,7 +146,6 @@ class ListenerCog(commands.Cog, name="listener"):
             return False
 
     async def handle_image_message(self, message, mode=""):
-        # await log_message(message)
         image_response = await self.bot.get_cog("image_caption").image_comment(
             message, message.clean_content
         )
@@ -206,9 +154,7 @@ class ListenerCog(commands.Cog, name="listener"):
             await self.bot.get_cog("chatbot").chat_command_nr(
                 message.author.display_name, message.channel.id, image_response
             )
-            # self.bot.sent_last_message[str(message.channel.id)] = False
             await self.add_message_to_dict(message, image_response)
-            # await self.set_timer(message.channel.id)
         else:
             async with message.channel.typing():
                 response = await self.bot.get_cog("chatbot").chat_command(
@@ -219,7 +165,7 @@ class ListenerCog(commands.Cog, name="listener"):
                 )
                 await self.add_message_to_dict(message, image_response)
                 if response:
-                    # If the response is more than 2000 characters, split it
+                    # Discord rejects messages over 2000 chars; chunk just under.
                     chunks = [
                         response[i : i + 1998] for i in range(0, len(response), 1998)
                     ]
@@ -229,18 +175,13 @@ class ListenerCog(commands.Cog, name="listener"):
                         await self.add_message_to_dict(
                             response_obj, response_obj.clean_content
                         )
-                        # self.bot.sent_last_message[str(message.channel.id)] = True
-                        # await log_message(response_obj)
 
     async def handle_text_message(self, message, mode=""):
-        # await log_message(message)
         if mode == "nr":
             await self.bot.get_cog("chatbot").chat_command_nr(
                 message.author.display_name, message.channel.id, message.clean_content
             )
-            # self.bot.sent_last_message[str(message.channel.id)] = False
             await self.add_message_to_dict(message, message.clean_content)
-            # await self.set_timer(message.channel.id)
         else:
             response = await self.bot.get_cog("chatbot").chat_command(
                 message.author.display_name,
@@ -250,7 +191,6 @@ class ListenerCog(commands.Cog, name="listener"):
             )
             await self.add_message_to_dict(message, message.clean_content)
             async with message.channel.typing():
-                # If the response is more than 2000 characters, split it
                 chunks = [response[i : i + 1998] for i in range(0, len(response), 1998)]
                 for chunk in chunks:
                     print(chunk)
@@ -258,8 +198,6 @@ class ListenerCog(commands.Cog, name="listener"):
                     await self.add_message_to_dict(
                         response_obj, response_obj.clean_content
                     )
-                    # self.bot.sent_last_message[str(message.channel.id)] = True
-                    # await log_message(response_obj)
 
     async def set_listen_only_mode_timer(self, channel_id):
         # Start the timer

@@ -214,10 +214,8 @@ class TextGen(LLM):
             params["stopping_strings"] = params.pop(
                 "stop"
             )  # Rename 'stop' to 'stopping_strings'
-            print(params["stopping_strings"])  # TODO: Remove this line
             request = params.copy()
             request["prompt"] = prompt
-            print(request)  # TODO: Remove this line
             response = requests.post(url, json=request)
 
             if response.status_code == 200:
@@ -280,7 +278,6 @@ class TextGen(LLM):
         url = f"{self.model_url}/api/v1/stream"
 
         request = params.copy()
-        print(request)  # TODO: Remove this line
         request["prompt"] = prompt
 
         websocket_client = websocket.WebSocket()

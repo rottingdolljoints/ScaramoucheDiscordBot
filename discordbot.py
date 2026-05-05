@@ -22,14 +22,8 @@ DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 ENDPOINT = str(os.getenv("ENDPOINT"))
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 CHAT_HISTORY_LINE_LIMIT = os.getenv("CHAT_HISTORY_LINE_LIMIT")
-try:
-    ALWAYS_REPLY = os.getenv("ALWAYS_REPLY")
-except:
-    ALWAYS_REPLY = True
-if os.getenv("MAX_NEW_TOKENS") is not None:
-    MAX_NEW_TOKENS = os.getenv("MAX_NEW_TOKENS")
-else:
-    MAX_NEW_TOKENS = 300
+ALWAYS_REPLY = os.getenv("ALWAYS_REPLY", "T")
+MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS") or 300)
 
 intents = discord.Intents.all()
 bot = Bot(command_prefix="/", intents=intents, help_command=None)
@@ -38,8 +32,8 @@ if len(bot.endpoint.split("/api")) > 0:
     bot.endpoint = bot.endpoint.split("/api")[0]
 bot.chatlog_dir = "chatlog_dir"
 bot.endpoint_connected = False
-bot.always_reply = True if ALWAYS_REPLY.lower() == "t" else False
-print(f'ALWAYS_REPLY: {bot.always_reply}')
+bot.always_reply = ALWAYS_REPLY.lower() == "t"
+print(f"ALWAYS_REPLY: {bot.always_reply}")
 bot.channel_id = CHANNEL_ID
 bot.num_lines_to_keep = int(CHAT_HISTORY_LINE_LIMIT)
 bot.guild_ids = [int(x) for x in CHANNEL_ID.split(",")]
@@ -91,29 +85,26 @@ def upload_tavern_character(img, name1, name2):
     return upload_character(json.dumps(_json), img, tavern=True)
 
 
-try:
+if os.path.isdir(cards_folder):
     for filename in os.listdir(cards_folder):
-        if filename.endswith(".png"):
+        if not filename.endswith(".png"):
+            continue
+        try:
             with open(os.path.join(cards_folder, filename), "rb") as read_file:
                 img = read_file.read()
-
-                name1 = "User"
-                name2 = "Character"
-                tavern_character_data = upload_tavern_character(img, name1, name2)
+            tavern_character_data = upload_tavern_character(img, "User", "Character")
             with open(
                 os.path.join(characters_folder, tavern_character_data + ".json")
             ) as read_file:
                 character_data = json.load(read_file)
-                # characters.append(character_data)
-            read_file.close()
-            if not os.path.exists(f"{cards_folder}/Converted"):
-                os.makedirs(f"{cards_folder}/Converted")
+            converted_dir = os.path.join(cards_folder, "Converted")
+            os.makedirs(converted_dir, exist_ok=True)
             os.rename(
                 os.path.join(cards_folder, filename),
-                os.path.join(f"{cards_folder}/Converted/", filename),
+                os.path.join(converted_dir, filename),
             )
-except:
-    pass
+        except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
+            print(f"Skipping card {filename}: {e}")
 
 
 # Load character data from JSON files in the character folder
@@ -142,10 +133,9 @@ if os.path.exists("chardata.json"):
         character_data = json.load(read_file)
     # Prompt the user to use the same character
     print(f"Last Character used: {character_data['char_name']}")
-    # Set up the timer
     try:
         answer = input(f"\nUse this character? (y/n) [y]: ")
-    except:
+    except (EOFError, KeyboardInterrupt):
         answer = "y"
 
 else:
@@ -229,7 +219,7 @@ async def on_ready():
             # check that the channel is a text channel
             if isinstance(channel, discord.TextChannel):
                 channel_name = channel.name
-                print(f"{guild.name} \ {channel_name}")
+                print(f"{guild.name} / {channel_name}")
             else:
                 print(f"Channel with ID {bot.channel_id} is not a text channel")
         except AttributeError:

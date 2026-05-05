@@ -1,34 +1,22 @@
 from dotenv import load_dotenv
 from helpers.custom_memory import CustomBufferWindowMemory
 from langchain.prompts.prompt import PromptTemplate
-from langchain.llms import KoboldApiLLM, TextGen
 from langchain.chains import ConversationChain
 import json
-import requests
 import discord
-from discord import app_commands
 from discord.ext import commands
 import os
 
 
-# load environment STOP_SEQUENCES variables and split them into a list by comma
 load_dotenv()
 CHAT_HISTORY_LINE_LIMIT = int(os.getenv("CHAT_HISTORY_LINE_LIMIT"))
 STOP_SEQUENCES = os.getenv("STOP_SEQUENCES")
 
-# Replace escaped newline sequences with actual newline characters
+# Replace escaped newline sequences with actual newline characters, then split by comma.
 try:
-    STOP_SEQUENCES = STOP_SEQUENCES.replace("\\n", "\n")
-    # Split stop sequences into a list
-    STOP_SEQUENCES = STOP_SEQUENCES.split(",")
+    STOP_SEQUENCES = STOP_SEQUENCES.replace("\\n", "\n").split(",")
 except AttributeError:
     print("STOP_SEQUENCES not provided in .env")
-    pass
-
-
-def embedder(msg):
-    embed = discord.Embed(description=f"{msg}", color=0x9C84EF)
-    return embed
 
 
 class Chatbot:
@@ -38,9 +26,8 @@ class Chatbot:
         self.endpoint = bot.endpoint
         self.llm = self.bot.llm
 
-        self.histories = {}  # Initialize the history dictionary
-        self.stop_sequences = {}  # Initialize the stop sequences dictionary
-        # select KoboldApiLLM or TextGen based on endpoint
+        self.histories = {}
+        self.stop_sequences = {}
 
         with open("chardata.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -226,12 +213,7 @@ class ChatbotCog(commands.Cog, name="chatbot"):
         chatlog_filename = os.path.join(
             self.chatlog_dir, f"{self.chatbot.char_name}_{server_name}_chatlog.log"
         )
-        if (
-            message.guild
-            and self.chatbot.convo_filename != chatlog_filename
-            or not message.guild
-            and self.chatbot.convo_filename != chatlog_filename
-        ):
+        if self.chatbot.convo_filename != chatlog_filename:
             await self.chatbot.set_convo_filename(chatlog_filename)
         response = await self.chatbot.generate_response(message, message_content)
         return response

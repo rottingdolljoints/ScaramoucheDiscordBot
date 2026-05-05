@@ -1,36 +1,24 @@
+# Python
 *.pyc
 *.swp
 *.egg-info
-__pycache__
-.DS_Store
-.idea
-# Generated files
-backend/oasst-openapi.json
-.env
-.venv
-Cards
-Characters
-chatlog_dir
-chardata.json
-# Git ignore file for Python project
-
-# Ignore files and directories that don't matter
-/.git
-node_modules
-venv
-
-# Ignore build artifacts
-__pycache__
-*.egg-info
 *.egg
+__pycache__/
 
-# Ignore tests
-tests
-test
+# Virtual environments
+.venv/
+venv/
 
-# Ignore coverage reports
-coverage
+# Environment / secrets
+.env
 
-# Ignore logs
-logs
+# Editors / OS
+.DS_Store
+.idea/
 .vscode/settings.json
+
+# Bot runtime data
+Cards/
+Characters/
+chatlog_dir/
+chardata.json
